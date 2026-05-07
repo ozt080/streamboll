@@ -13,20 +13,21 @@
     <style>
         :root { --netflix-red: #e50914; --dark-bg: #0a0a0a; --card-bg: #141414; }
         
-        body { background-color: var(--dark-bg); color: white; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--dark-bg); color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
         
-        /* Navbar style */
+        /* Navbar */
         .navbar { background-color: rgba(0,0,0,0.9) !important; border-bottom: 1px solid #222; }
         .navbar-brand { color: var(--netflix-red) !important; font-weight: 900; letter-spacing: 2px; }
 
-        /* Lecteur Vidéo Statique en haut */
+        /* Lecteur Vidéo & Loader */
         .video-wrapper { 
             position: sticky; top: 0; z-index: 1000; 
             background: black; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            position: relative;
         }
         #video { width: 100%; aspect-ratio: 16/9; max-height: 50vh; display: block; margin: auto; }
 
-        /* Grille Netflix */
+        /* Grille & Cartes */
         .channel-card {
             background: var(--card-bg);
             border: none;
@@ -41,11 +42,24 @@
             box-shadow: 0 0 20px rgba(229, 9, 20, 0.4);
             z-index: 10;
         }
-        .card-img-top { height: 120px; object-fit: cover; background: #222; display: flex; align-items: center; justify-content: center; font-size: 2rem;}
+        .card-img-top { 
+            height: 140px; 
+            background: #1a1a1a; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 15px;
+        }
+        .card-img-top img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .card-body { padding: 10px; text-align: center; }
-        .card-title { font-size: 0.9rem; font-weight: 600; margin: 0; }
+        .card-title { font-size: 0.85rem; font-weight: 600; margin: 0; text-transform: uppercase; }
 
-        .section-title { font-size: 1.5rem; font-weight: bold; margin: 20px 0; color: #aaa; }
+        .section-title { font-size: 1.3rem; font-weight: bold; margin: 25px 0 15px 0; color: #efefef; border-left: 4px solid var(--netflix-red); padding-left: 10px; }
+
+        /* Scrollbar Personnalisée */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: var(--netflix-red); border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -57,75 +71,106 @@
 </nav>
 
 <div class="video-wrapper">
+    <div id="loader" class="position-absolute top-50 start-50 translate-middle" style="display: none; z-index: 2000;">
+        <div class="spinner-border text-danger" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
     <video id="video" controls autoplay></video>
 </div>
 
 <div class="container mt-4">
     <div class="input-group mb-3">
         <span class="input-group-text bg-dark border-secondary text-white"><i class="bi bi-search"></i></span>
-        <input type="text" id="searchBar" class="form-control bg-dark border-secondary text-white" placeholder="Rechercher une chaîne..." onkeyup="filterChannels()">
+        <input type="text" id="searchBar" class="form-control bg-dark border-secondary text-white" placeholder="Rechercher une chaîne ou un film..." onkeyup="filterAll()">
     </div>
-</div>
 
-<div class="container pb-5">
     <h2 class="section-title">Chaînes en direct</h2>
-    <div class="row g-3" id="channelGrid">
-        </div>
+    <div class="row g-3 mb-4" id="channelGrid"></div>
+
+    <h2 class="section-title">Films & VOD</h2>
+    <div class="row g-3 pb-5" id="vodGrid"></div>
 </div>
 
 <script>
     const channels = [
-        { name: "FRANCE 24", icon: "bi-globe2", url: "https://static.france24.com/live/F24_FR_LO_HLS/live_tv.m3u8" },
-        { name: "ARTE FR", icon: "bi-palette", url: "https://artelive-lh.akamaihd.net/i/artelive_fr@393592/master.m3u8" },
-        { name: "EURONEWS", icon: "bi-broadcast", url: "https://euronews-euronews-french-3-fr.samsung.wurl.tv/playlist.m3u8" },
-        { name: "BFM BUSINESS", icon: "bi-graph-up-arrow", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" }
+        { name: "FRANCE 24", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/France_24_logo.svg/512px-France_24_logo.svg.png", url: "https://static.france24.com/live/F24_FR_LO_HLS/live_tv.m3u8" },
+        { name: "ARTE FR", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Arte_logo.svg/512px-Arte_logo.svg.png", url: "https://artelive-lh.akamaihd.net/i/artelive_fr@393592/master.m3u8" },
+        { name: "EURONEWS", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Euronews_logo_2016.svg/512px-Euronews_logo_2016.svg.png", url: "https://euronews-euronews-french-3-fr.samsung.wurl.tv/playlist.m3u8" },
+        { name: "BFM BUSINESS", logo: "https://upload.wikimedia.org/wikipedia/commons/c/c5/BFM_Business_logo_2020.png", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" }
     ];
 
-    const grid = document.getElementById('channelGrid');
+    const movies = [
+        { name: "Big Buck Bunny", poster: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+        { name: "Elephants Dream", poster: "https://upload.wikimedia.org/wikipedia/commons/e/e8/Elephants_Dream_poster.jpg", url: "https://multiplatform-f.akamaihd.net/i/multi/will/apple/master.m3u8" }
+    ];
+
+    const channelGrid = document.getElementById('channelGrid');
+    const vodGrid = document.getElementById('vodGrid');
     const video = document.getElementById('video');
+    const loader = document.getElementById('loader');
     let hls = new Hls();
 
-    function displayChannels(filter = "") {
-        grid.innerHTML = "";
+    function displayAll(filter = "") {
+        // Affichage TV
+        channelGrid.innerHTML = "";
         channels.forEach(chan => {
             if (chan.name.toLowerCase().includes(filter.toLowerCase())) {
-                const card = `
-                    <div class="col-6 col-md-4 col-lg-2 animate-flicker">
+                channelGrid.innerHTML += `
+                    <div class="col-6 col-md-4 col-lg-2">
                         <div class="card channel-card" onclick="playStream('${chan.url}')">
-                            <div class="card-img-top"><i class="bi ${chan.icon}"></i></div>
+                            <div class="card-img-top"><img src="${chan.logo}" alt="${chan.name}"></div>
                             <div class="card-body"><h5 class="card-title">${chan.name}</h5></div>
                         </div>
                     </div>`;
-                grid.innerHTML += card;
+            }
+        });
+
+        // Affichage VOD
+        vodGrid.innerHTML = "";
+        movies.forEach(mov => {
+            if (mov.name.toLowerCase().includes(filter.toLowerCase())) {
+                vodGrid.innerHTML += `
+                    <div class="col-6 col-md-4 col-lg-2">
+                        <div class="card channel-card" onclick="playStream('${mov.url}')">
+                            <div class="card-img-top" style="height:200px; padding:0;"><img src="${mov.poster}" style="width:100%; height:100%; object-fit:cover;"></div>
+                            <div class="card-body"><h5 class="card-title">${mov.name}</h5></div>
+                        </div>
+                    </div>`;
             }
         });
     }
 
-    function filterChannels() {
+    function filterAll() {
         const query = document.getElementById('searchBar').value;
-        displayChannels(query);
+        displayAll(query);
     }
 
     function playStream(url) {
+        loader.style.display = 'block';
         if (Hls.isSupported()) {
             hls.destroy();
             hls = new Hls();
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+                loader.style.display = 'none';
+            });
         } else {
             video.src = url;
             video.play();
+            video.onplaying = () => loader.style.display = 'none';
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Lancement initial
-    displayChannels();
+    displayAll();
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
 </script>
+
 </body>
 </html>
