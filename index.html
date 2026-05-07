@@ -3,83 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Streamboll - IPTV</title>
+    <title>Streamboll - Premium IPTV</title>
+    
+    <link rel="manifest" href="manifest.json">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
     <style>
-        body { background-color: #121212; color: white; font-family: sans-serif; }
-        .video-section { position: sticky; top: 0; z-index: 100; background: #121212; padding-bottom: 10px; }
-        #video { width: 100%; aspect-ratio: 16/9; background: #000; border-bottom: 2px solid #0d6efd; }
-        .channel-list { padding: 15px; }
-        .btn-channel { 
-            text-align: left; 
-            margin-bottom: 10px; 
-            background: #1e1e1e; 
-            border: 1px solid #333; 
-            color: white;
-            transition: 0.3s;
+        :root { --netflix-red: #e50914; --dark-bg: #0a0a0a; --card-bg: #141414; }
+        
+        body { background-color: var(--dark-bg); color: white; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Navbar style */
+        .navbar { background-color: rgba(0,0,0,0.9) !important; border-bottom: 1px solid #222; }
+        .navbar-brand { color: var(--netflix-red) !important; font-weight: 900; letter-spacing: 2px; }
+
+        /* Lecteur Vidéo Statique en haut */
+        .video-wrapper { 
+            position: sticky; top: 0; z-index: 1000; 
+            background: black; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
-        .btn-channel:hover { background: #0d6efd; border-color: #0d6efd; }
+        #video { width: 100%; aspect-ratio: 16/9; max-height: 50vh; display: block; margin: auto; }
+
+        /* Grille Netflix */
+        .channel-card {
+            background: var(--card-bg);
+            border: none;
+            border-radius: 8px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+            height: 100%;
+        }
+        .channel-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(229, 9, 20, 0.4);
+            z-index: 10;
+        }
+        .card-img-top { height: 120px; object-fit: cover; background: #222; display: flex; align-items: center; justify-content: center; font-size: 2rem;}
+        .card-body { padding: 10px; text-align: center; }
+        .card-title { font-size: 0.9rem; font-weight: 600; margin: 0; }
+
+        .section-title { font-size: 1.5rem; font-weight: bold; margin: 20px 0; color: #aaa; }
     </style>
 </head>
 <body>
 
-<div class="video-section">
-    <video id="video" controls></video>
-    <div class="container mt-2">
-        <h4 id="currentChannel">Sélectionnez une chaîne</h4>
+<nav class="navbar navbar-expand-lg">
+    <div class="container">
+        <a class="navbar-brand" href="#">STREAMBOLL</a>
     </div>
+</nav>
+
+<div class="video-wrapper">
+    <video id="video" controls autoplay></video>
 </div>
 
-<div class="container channel-list">
-    <div class="row" id="buttonsContainer">
-        <!-- Les boutons vont s'afficher ici -->
-    </div>
+<div class="container pb-5">
+    <h2 class="section-title">Chaînes en direct</h2>
+    <div class="row g-3" id="channelGrid">
+        </div>
 </div>
 
 <script>
-    // LISTE DES CHAÎNES (Tu peux en ajouter ici)
-    // Note : Ce sont des flux légaux et gratuits pour l'exemple
     const channels = [
-        { name: "France 24 (Infos)", url: "https://static.france24.com/live/F24_FR_LO_HLS/live_tv.m3u8" },
-        { name: "Arte (Culture)", url: "https://artelive-lh.akamaihd.net/i/artelive_fr@393592/master.m3u8" },
-        { name: "Euronews", url: "https://euronews-euronews-french-3-fr.samsung.wurl.tv/playlist.m3u8" },
-        { name: "Bfm Business", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" }
+        { name: "FRANCE 24", icon: "bi-globe2", url: "https://static.france24.com/live/F24_FR_LO_HLS/live_tv.m3u8" },
+        { name: "ARTE FR", icon: "bi-palette", url: "https://artelive-lh.akamaihd.net/i/artelive_fr@393592/master.m3u8" },
+        { name: "EURONEWS", icon: "bi-broadcast", url: "https://euronews-euronews-french-3-fr.samsung.wurl.tv/playlist.m3u8" },
+        { name: "BFM BUSINESS", icon: "bi-graph-up-arrow", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" },
+        { name: "METEO+ (Live)", icon: "bi-cloud-sun", url: "https://r9---sn-a5meknsz.googlevideo.com/videoplayback/id/e2e8e3d368e7d8d2/itag/18/source/web_video/begin/0/len/100/vprv/1/playlist_type/LIVE/..." } // Exemple
     ];
 
+    const grid = document.getElementById('channelGrid');
     const video = document.getElementById('video');
-    const container = document.getElementById('buttonsContainer');
-    const title = document.getElementById('currentChannel');
     let hls = new Hls();
 
-    // Création automatique des boutons
     channels.forEach(chan => {
-        let col = document.createElement('div');
-        col.className = 'col-6 col-md-4';
-        col.innerHTML = `<button class="btn btn-channel w-100" onclick="play('${chan.url}', '${chan.name}')">${chan.name}</button>`;
-        container.appendChild(col);
+        const card = `
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card channel-card" onclick="playStream('${chan.url}')">
+                    <div class="card-img-top">
+                        <i class="bi ${chan.icon}"></i>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">${chan.name}</h5>
+                    </div>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += card;
     });
 
-    function play(url, name) {
-        title.innerText = "Lecture : " + name;
+    function playStream(url) {
         if (Hls.isSupported()) {
-            hls.destroy(); // On nettoie l'ancienne lecture
+            hls.destroy();
             hls = new Hls();
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                video.play();
-            });
-        } 
-        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Pour Safari (iPhone)
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+        } else {
             video.src = url;
-            video.addEventListener('loadedmetadata', function() {
-                video.play();
-            });
+            video.play();
         }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // --- Enregistrement du Service Worker ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+        .then(() => console.log("Service Worker Enregistré !"));
     }
 </script>
-
 </body>
 </html>
