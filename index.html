@@ -60,6 +60,13 @@
     <video id="video" controls autoplay></video>
 </div>
 
+<div class="container mt-4">
+    <div class="input-group mb-3">
+        <span class="input-group-text bg-dark border-secondary text-white"><i class="bi bi-search"></i></span>
+        <input type="text" id="searchBar" class="form-control bg-dark border-secondary text-white" placeholder="Rechercher une chaîne..." onkeyup="filterChannels()">
+    </div>
+</div>
+
 <div class="container pb-5">
     <h2 class="section-title">Chaînes en direct</h2>
     <div class="row g-3" id="channelGrid">
@@ -71,29 +78,33 @@
         { name: "FRANCE 24", icon: "bi-globe2", url: "https://static.france24.com/live/F24_FR_LO_HLS/live_tv.m3u8" },
         { name: "ARTE FR", icon: "bi-palette", url: "https://artelive-lh.akamaihd.net/i/artelive_fr@393592/master.m3u8" },
         { name: "EURONEWS", icon: "bi-broadcast", url: "https://euronews-euronews-french-3-fr.samsung.wurl.tv/playlist.m3u8" },
-        { name: "BFM BUSINESS", icon: "bi-graph-up-arrow", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" },
-        { name: "METEO+ (Live)", icon: "bi-cloud-sun", url: "https://r9---sn-a5meknsz.googlevideo.com/videoplayback/id/e2e8e3d368e7d8d2/itag/18/source/web_video/begin/0/len/100/vprv/1/playlist_type/LIVE/..." } // Exemple
+        { name: "BFM BUSINESS", icon: "bi-graph-up-arrow", url: "https://alticebfmbusiness-hls-live-m6-v4-aka.akamaized.net/out/v1/7994849ecb3c4bd389965d1d6a89c961/index.m3u8" }
     ];
 
     const grid = document.getElementById('channelGrid');
     const video = document.getElementById('video');
     let hls = new Hls();
 
-    channels.forEach(chan => {
-        const card = `
-            <div class="col-6 col-md-4 col-lg-2">
-                <div class="card channel-card" onclick="playStream('${chan.url}')">
-                    <div class="card-img-top">
-                        <i class="bi ${chan.icon}"></i>
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">${chan.name}</h5>
-                    </div>
-                </div>
-            </div>
-        `;
-        grid.innerHTML += card;
-    });
+    function displayChannels(filter = "") {
+        grid.innerHTML = "";
+        channels.forEach(chan => {
+            if (chan.name.toLowerCase().includes(filter.toLowerCase())) {
+                const card = `
+                    <div class="col-6 col-md-4 col-lg-2 animate-flicker">
+                        <div class="card channel-card" onclick="playStream('${chan.url}')">
+                            <div class="card-img-top"><i class="bi ${chan.icon}"></i></div>
+                            <div class="card-body"><h5 class="card-title">${chan.name}</h5></div>
+                        </div>
+                    </div>`;
+                grid.innerHTML += card;
+            }
+        });
+    }
+
+    function filterChannels() {
+        const query = document.getElementById('searchBar').value;
+        displayChannels(query);
+    }
 
     function playStream(url) {
         if (Hls.isSupported()) {
@@ -109,10 +120,11 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // --- Enregistrement du Service Worker ---
+    // Lancement initial
+    displayChannels();
+
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-        .then(() => console.log("Service Worker Enregistré !"));
+        navigator.serviceWorker.register('sw.js');
     }
 </script>
 </body>
